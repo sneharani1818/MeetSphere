@@ -20,8 +20,14 @@ function App() {
       path: "/signup",
       element: <Signup />
     },
-    { path: "/dashboard", element: <Dashboard /> },
-    { path: "/meeting/:meetingId", element: <LobbyScreen /> }, // VideoCall route
+    {
+      path: "/dashboard",
+      element: <Dashboard />
+    },
+    {
+      path: "/meeting/:roomId",
+      element: <LobbyScreen />
+    }, // VideoCall route
   ])
   return (
     <>

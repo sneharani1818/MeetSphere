@@ -26,15 +26,6 @@ router.post("/start-meeting", async (req, res) => {
         });
 
         await newMeeting.save();
-        setRoom(newRoomId);
-        localStorage.setItem("latestRoomId", newRoomId);
-        // Emit event to notify other users (if needed) 
-        io.emit("meeting:started", newMeeting);
-        // Optionally, you can send the roomId back to the client
-        // so they can join the meeting directly
-        socket.emit("meeting:started", newMeeting._id);
-        // Send response back to the client
-
         res.status(201).json({ message: "Meeting started successfully", roomId: newMeeting._id });
     } catch (err) {
         console.error("Start meeting error:", err);
@@ -61,6 +52,7 @@ router.post("/join-meeting", async (req, res) => {
 
         // Add user to the meeting attendees
         meeting.attendees.push(user._id);
+        meeting.startTime = new Date(); // Update start time to current time
         await meeting.save();
 
         res.status(200).json({ message: "Joined meeting successfully", roomId: meeting._id });
@@ -69,6 +61,7 @@ router.post("/join-meeting", async (req, res) => {
         res.status(500).json({ error: "Server error" });
     }
 });
+
 // GET /api/meeting/:roomId 
 router.get("/:roomId", async (req, res) => {
     const { roomId } = req.params; // Extract roomId from the request parameters

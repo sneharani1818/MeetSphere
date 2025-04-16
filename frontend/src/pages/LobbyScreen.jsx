@@ -1,31 +1,30 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useSocket } from "../context/SocketProvider";
 import axios from "axios";
-import 'bootstrap/dist/css/bootstrap.min.css';
 
 const LobbyScreen = () => {
+    const { roomId } = useParams();
+    console.log("In lobby ", roomId)
+
     const [email, setEmail] = useState("");
-    const [room, setRoom] = useState("");
+    const [room, setRoom] = useState(roomId || "");
     const [copied, setCopied] = useState(false);
+
     const [videoEnabled, setVideoEnabled] = useState(true);
     const [audioEnabled, setAudioEnabled] = useState(true);
     const [stream, setStream] = useState(null);
-    const videoRef = useRef(null);
 
+    const videoRef = useRef(null);
     const socket = useSocket();
     const location = useLocation();
     const navigate = useNavigate();
 
-    // Load email from localStorage
     useEffect(() => {
-        const storedEmail = localStorage.getItem("email");
-        if (storedEmail) setEmail(storedEmail);
-    }, []);
-
-    // Handle room ID from backend or localStorage
-    useEffect(() => {
+        const savedEmail = localStorage.getItem("userEmail");
         const localRoomId = localStorage.getItem("latestRoomId");
+
+        if (savedEmail) setEmail(savedEmail);
         if (location.state?.roomId) {
             setRoom(location.state.roomId);
         } else if (localRoomId) {
@@ -33,36 +32,69 @@ const LobbyScreen = () => {
         }
     }, [location]);
 
-    // Get video/audio
     useEffect(() => {
         let activeStream = null;
+
         const getMedia = async () => {
             try {
-                const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                const mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true,
+                });
                 activeStream = mediaStream;
                 setStream(mediaStream);
-                if (videoRef.current) videoRef.current.srcObject = mediaStream;
+
+                if (videoRef.current) {
+                    videoRef.current.srcObject = mediaStream;
+                }
             } catch (err) {
                 console.error("Error accessing media devices:", err);
             }
         };
 
         getMedia();
+
         return () => {
-            if (activeStream) activeStream.getTracks().forEach((track) => track.stop());
+            if (activeStream) {
+                activeStream.getTracks().forEach((track) => track.stop());
+            }
         };
     }, []);
 
-    // Emit room:join
+    const handleStartMeeting = async () => {
+
+        if (!email) {
+            alert("Please enter your email before starting a meeting.");
+            return;
+        }
+
+        try {
+            console.log("In lobby screeen ", roomId)
+
+            const response = await axios.get("/api/meeting/start-meeting", { params: { email }, });
+            console.log("Response:", response.data); // debugging line
+            setRoom(response.data.roomId);
+            const newRoomId = response.data.roomId;
+            console.log(response.data.email)
+            setEmail(response.data.email);
+            localStorage.setItem("latestRoomId", newRoomId);
+            setRoom(newRoomId);
+
+        } catch (error) {
+            console.error("Failed to start meeting", error);
+            alert("Could not start meeting. Please make sure your email is registered.");
+        }
+    };
+
     const handleSubmitForm = useCallback(
-        () => {
-            if (!email || !room) return;
+        (e) => {
+            e.preventDefault();
+            localStorage.setItem("userEmail", email);
             socket.emit("room:join", { email, room, videoEnabled, audioEnabled });
         },
         [email, room, socket, videoEnabled, audioEnabled]
     );
 
-    // Navigate to Room screen
     const handleJoinRoom = useCallback(
         (data) => {
             const { room } = data;
@@ -91,96 +123,95 @@ const LobbyScreen = () => {
     };
 
     const toggleVideo = () => {
-        const videoTrack = stream?.getVideoTracks()[0];
-        if (videoTrack) {
-            videoTrack.enabled = !videoTrack.enabled;
-            setVideoEnabled(videoTrack.enabled);
+        if (stream) {
+            const videoTrack = stream.getVideoTracks()[0];
+            if (videoTrack) {
+                videoTrack.enabled = !videoTrack.enabled;
+                setVideoEnabled(videoTrack.enabled);
+            }
         }
     };
 
     const toggleAudio = () => {
-        const audioTrack = stream?.getAudioTracks()[0];
-        if (audioTrack) {
-            audioTrack.enabled = !audioTrack.enabled;
-            setAudioEnabled(audioTrack.enabled);
-        }
-    };
-
-    const handleStartMeeting = async () => {
-        if (!email) {
-            alert("Please enter your email.");
-            return;
-        }
-        try {
-            const res = await axios.post("/api/meeting/start-meeting", { email });
-            const newRoomId = res.data.roomId;
-            console.log("Generated room ID:", newRoomId);
-            setRoom(newRoomId);
-            localStorage.setItem("latestRoomId", newRoomId);
-            handleSubmitForm(); // 👈 JOIN AUTOMATICALLY
-        } catch (err) {
-            console.error("Start meeting error:", err);
-            alert("Could not start meeting. Please check email.");
+        if (stream) {
+            const audioTrack = stream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = !audioTrack.enabled;
+                setAudioEnabled(audioTrack.enabled);
+            }
         }
     };
 
     return (
-        <div className="container py-4">
-            <div className="card shadow p-4">
-                <h2 className="mb-4 text-center">MeetSphere Lobby</h2>
+        <div className="container py-5">
+            <div className="row justify-content-center">
+                <div className="col-md-8">
 
-                {room && (
-                    <div className="alert alert-secondary d-flex justify-content-between align-items-center">
-                        <div><strong>Meeting ID:</strong> {room}</div>
-                        <button className="btn btn-sm btn-outline-primary" onClick={handleCopy}>
-                            {copied ? "Copied!" : "Copy"}
-                        </button>
-                    </div>
-                )}
+                    <div className="card shadow-lg">
+                        <div className="card-body">
+                            <h3 className="card-title text-center mb-4">Lobby</h3>
 
-                <div className="text-center mb-4">
-                    <video ref={videoRef} autoPlay muted className="rounded" style={{ width: "300px" }} />
-                    <div className="mt-2">
-                        <button className="btn btn-outline-dark me-2" onClick={toggleVideo}>
-                            {videoEnabled ? "Turn Off Video" : "Turn On Video"}
-                        </button>
-                        <button className="btn btn-outline-dark" onClick={toggleAudio}>
-                            {audioEnabled ? "Mute" : "Unmute"}
-                        </button>
+                            {room && (
+                                <div className="alert alert-info d-flex justify-content-between align-items-center">
+                                    <div><strong>Room ID:</strong> {room}</div>
+                                    <button className="btn btn-outline-dark btn-sm" onClick={handleCopy}>
+                                        {copied ? "Copied!" : "Copy"}
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="mb-3 text-center">
+                                <video
+                                    ref={videoRef}
+                                    autoPlay
+                                    muted
+                                    className="rounded"
+                                    style={{ width: "100%", maxHeight: "300px", objectFit: "cover" }}
+                                />
+                                <div className="mt-2">
+                                    <button className="btn btn-outline-primary me-2" onClick={toggleVideo}>
+                                        {videoEnabled ? "Turn Off Video" : "Turn On Video"}
+                                    </button>
+                                    <button className="btn btn-outline-secondary" onClick={toggleAudio}>
+                                        {audioEnabled ? "Mute" : "Unmute"}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleSubmitForm}>
+                                <div className="mb-3">
+                                    <label htmlFor="email" className="form-label">Email address</label>
+                                    <input
+                                        type="email"
+                                        className="form-control"
+                                        id="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        required
+                                    />
+                                </div>
+                                <div className="mb-3">
+                                    <label htmlFor="room" className="form-label">Room ID</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        id="room"
+                                        value={room}
+                                        onChange={(e) => setRoom(e.target.value)}
+                                        required
+                                    />
+                                </div>
+                                <div className="d-flex justify-content-between">
+                                    <button type="submit" className="btn btn-success">Join Meeting</button>
+                                    <button type="button" className="btn btn-dark" onClick={handleStartMeeting}>
+                                        Start New Meeting
+                                    </button>
+                                </div>
+                            </form>
+
+                        </div>
                     </div>
                 </div>
-
-                <form onSubmit={(e) => { e.preventDefault(); handleSubmitForm(); }}>
-                    <div className="mb-3">
-                        <label>Email ID</label>
-                        <input
-                            type="email"
-                            className="form-control"
-                            value={email}
-                            onChange={(e) => {
-                                setEmail(e.target.value);
-                                localStorage.setItem("email", e.target.value);
-                            }}
-                            required
-                        />
-                    </div>
-                    <div className="mb-3">
-                        <label>Room ID</label>
-                        <input
-                            type="text"
-                            className="form-control"
-                            value={room}
-                            onChange={(e) => setRoom(e.target.value)}
-                            required
-                        />
-                    </div>
-                    <div className="d-flex justify-content-between">
-                        <button type="submit" className="btn btn-success">Join Meeting</button>
-                        <button type="button" className="btn btn-primary" onClick={handleStartMeeting}>
-                            Start New Meeting
-                        </button>
-                    </div>
-                </form>
             </div>
         </div>
     );

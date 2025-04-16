@@ -13,9 +13,6 @@ const Dashboard = () => {
         try {
             console.log(userEmail)
             const response = await axios.post('http://localhost:5000/api/meeting/start-meeting', { email: userEmail });
-            console.log(response)
-            const { data } = response;
-            console.log("Response from start meeting:", data);
             const roomId = response.data.roomId;
             console.log(roomId);
             navigate(`/meeting/${roomId}`); // Pass roomId to LobbyScreen
