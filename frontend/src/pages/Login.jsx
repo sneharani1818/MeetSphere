@@ -27,11 +27,12 @@ const Login = () => {
 
             if (res.status === 200) {
                 console.log("Login successful:", res.data);
-                localStorage.setItem('user', JSON.stringify(res.data.user));
+                localStorage.setItem("email", res.data.user.email);
+                console.log("User saved to localStorage");
 
+                localStorage.setItem("email", res.data.user.email);
                 // Redirect to dashboard
                 navigate('/dashboard');
-                // navigate("/calling"); // Redirect to join meet page
             }
         } catch (err) {
             console.error("Login error:", err);

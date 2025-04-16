@@ -1,20 +1,24 @@
+// Dashboard.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-// import { v4 as uuidV4 } from 'uuid';
 import Navbar from './../components/Navbar';
-import axios from 'axios'; // Import axios
+import axios from 'axios';
 
 const Dashboard = () => {
     const navigate = useNavigate();
 
     const handleStartMeeting = async () => {
+        console.log("In handle start meeting function")
+        const userEmail = localStorage.getItem("email"); // or get it from context/auth state
         try {
-            // Make an API request to create a new meeting
-            console.log("In handle start meeting fucnttion")
-            const response = await axios.post('/api/start-meeting'); // Replace with your backend endpoint
-            console.log('Messge at frontend to start a new meeting')
-            const roomId = response.data.roomId; // Get the room ID from the response
-            navigate(`/videocall/${roomId}`); // Navigate to the video call page with the roomId
+            console.log(userEmail)
+            const response = await axios.post('http://localhost:5000/api/meeting/start-meeting', { email: userEmail });
+            console.log(response)
+            const { data } = response;
+            console.log("Response from start meeting:", data);
+            const roomId = response.data.roomId;
+            console.log(roomId);
+            navigate(`/meeting/${roomId}`); // Pass roomId to LobbyScreen
         } catch (error) {
             console.error('Error starting the meeting:', error);
         }
